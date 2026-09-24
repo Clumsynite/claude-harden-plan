@@ -1,0 +1,15 @@
+{
+  "name": "clumsyknight-harden-plan",
+  "owner": {
+    "name": "Clumsyknight",
+    "email": "clusmsyknight@gmail.com"
+  },
+  "description": "Harden an implementation plan so Claude Code can run it unattended in auto mode.",
+  "plugins": [
+    {
+      "name": "harden-plan",
+      "source": "./",
+      "description": "Adversarial plan review and repair: /harden-plan:harden-plan."
+    }
+  ]
+}
