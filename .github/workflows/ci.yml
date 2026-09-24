@@ -13,6 +13,10 @@ jobs:
       - name: JSON manifests
         run: jq -e . .claude-plugin/plugin.json .claude-plugin/marketplace.json > /dev/null
       - name: Skill frontmatter
-        run: head -1 skills/harden-plan/SKILL.md | grep -qx -- '---' && grep -q '^name: harden-plan$' skills/harden-plan/SKILL.md
+        run: |
+          head -1 skills/harden-plan/SKILL.md | grep -qx -- '---'
+          grep -q '^name: harden-plan$' skills/harden-plan/SKILL.md
       - name: Referenced files exist
-        run: test -f skills/harden-plan/references/checklist.md && test -f skills/harden-plan/references/critic-prompt.md
+        run: |
+          test -f skills/harden-plan/references/checklist.md
+          test -f skills/harden-plan/references/critic-prompt.md
