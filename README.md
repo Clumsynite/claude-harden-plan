@@ -1,7 +1,7 @@
 # harden-plan
 
 [![CI](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/ci.yml/badge.svg)](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/Clumsynite/claude-harden-plan?sort=semver)](https://github.com/Clumsynite/claude-harden-plan/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/Clumsynite/claude-harden-plan?display_name=release)](https://github.com/Clumsynite/claude-harden-plan/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Claude Code plugin that turns an implementation plan into one an agent can run **unattended in auto mode**: no guesses and no questions mid-run. It reviews, researches, fixes and asks. It never implements.
