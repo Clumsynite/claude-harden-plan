@@ -1,6 +1,7 @@
 # harden-plan
 
 [![CI](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/ci.yml/badge.svg)](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/ci.yml)
+[![Release](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/release.yml/badge.svg)](https://github.com/Clumsynite/claude-harden-plan/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/Clumsynite/claude-harden-plan?display_name=release)](https://github.com/Clumsynite/claude-harden-plan/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -79,9 +80,10 @@ The whole plugin is the skill: [`skills/harden-plan/SKILL.md`](skills/harden-pla
 
 `version` in `.claude-plugin/plugin.json` pins installed copies: users only get changes when it is bumped.
 
-1. Bump `version` in `.claude-plugin/plugin.json` and commit.
-2. Wait for CI to pass on `main`.
-3. `claude plugin tag --push .` (creates and pushes `harden-plan--v<version>`), then `gh release create harden-plan--v<version> --generate-notes`.
+Releases are built by CI/CD:
+
+1. Bump `version` in `.claude-plugin/plugin.json`, commit, and push to `main`.
+2. When CI passes on that push, `.github/workflows/release.yml` creates the tag `harden-plan--v<version>` and a GitHub release with generated notes at the tested commit. If that release already exists (e.g. a push without a version bump), it does nothing. It can also be run by hand from the Actions tab.
 
 ## License
 
