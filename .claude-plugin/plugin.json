@@ -1,7 +1,7 @@
 {
   "name": "harden-plan",
-  "version": "0.1.0",
-  "description": "Draft (if missing), adversarially review and repair an implementation plan until an agent can run it unattended in auto mode: grounds it in the real codebase, researches best practice, fixes every gap with evidence, asks all open questions in one batch, then stops without implementing.",
+  "version": "0.2.0",
+  "description": "Draft (if missing), adversarially review and repair an implementation plan until an agent can run it unattended in auto mode: grounds it in the real codebase, researches best practice, checks the executor environment, fixes every gap with evidence, gets a fresh-critic sign-off on the final plan, asks all open questions in one batch, then stops without implementing.",
   "author": {
     "name": "Clumsyknight",
     "email": "clusmsyknight@gmail.com"

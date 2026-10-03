@@ -42,29 +42,31 @@ A local marketplace loads the plugin in place, so edits take effect after `/relo
 
 The skill is user-invoked only (`disable-model-invocation`), so Claude never runs it unless you ask. It runs at `effort: high`.
 
-In plan mode it edits the plan file and finishes with `ExitPlanMode`, so you can approve the plan and pick auto mode. Outside plan mode it saves to `./PLAN.md` (or the file you gave it) and stops.
+In plan mode it edits the plan file and finishes with `ExitPlanMode`, so you can approve the plan and pick auto mode. Outside plan mode it edits the file you gave it (or saves a conversation-only plan to `./PLAN.md`) and stops.
 
 ## What it does
 
 | Phase | Work |
 |---|---|
-| 0. Locate | Find the plan: an argument, the plan-mode file, the latest plan in the conversation, or `~/.claude/plans/`. Draft one if there's none. |
-| 1. Ground | Check every file, symbol, script, env var and version the plan names against the repo, CLAUDE.md, lockfiles and CI. |
-| 2. Research | Look up best practice and known pitfalls for the installed versions, and cite the URLs. |
-| 3. Critique | Its own pass over a 13-dimension [checklist](skills/harden-plan/references/checklist.md), plus a separate [fresh-eyes critic](skills/harden-plan/references/critic-prompt.md) subagent that sees none of its findings. Two critics for high-risk plans. |
-| 4. Fix and iterate | Apply fixes, re-review the changed sections, and repeat until a round finds no new S1/S2 issues (at most 4 rounds). |
-| 5. Ask | All open questions in one `AskUserQuestion` batch, with a recommended option first. Destructive or outward-facing actions always get their own question. |
-| 6. Gate | Pass the auto-mode readiness gate, then hand off with the line "Plan hardened. Ready for auto mode." |
+| 0. Locate | Find the plan: an argument, the plan-mode file, the latest plan in the conversation, or `~/.claude/plans/`. Draft one if there's none. Detect a re-run (the plan already has a Hardening log) or a stale plan, and check the plan's objective against what you literally asked for. |
+| 1. Ground | Check every file, symbol, script, env var and version the plan names against the repo, CLAUDE.md, lockfiles and CI, plus the executor environment: hooks and guards that would block commands, your shell, user-only commands, branch, worktree, DB, and versions on remote hosts. |
+| 2. Research | Look up best practice and known pitfalls for the installed versions, and cite the URLs. Skipping research has to be justified in the log. |
+| 3. Critique | Its own pass over the [checklist](skills/harden-plan/references/checklist.md), plus a read-only [fresh-eyes critic](skills/harden-plan/references/critic-prompt.md) that reviews a snapshot with the earlier findings stripped out. Each critic gets a lens (correctness, failure, executor-env, outcome, simplicity); re-runs use a lens not used before. |
+| 4. Fix and iterate | Apply fixes, re-review the **whole** plan, run the plan linter, and repeat until a round finds no new confirmed S1/S2 issues (at most 3 rounds). |
+| 5. Ask | Once every critic has reported: try to answer each question from the repo, the machine, memory and past plans, then ask the rest in one `AskUserQuestion` batch with a recommended option first. Answers that change scope or the target trigger a re-check. Destructive or outward-facing actions always get their own question. |
+| 6. Sign-off and gate | A fresh critic reviews the final plan. "Plan hardened. Ready for auto mode." only if it finds no new S1/S2 and the readiness gate and linter pass; otherwise "Not ready: …". |
 
 Every finding cites evidence (`file:line`, command output, a doc URL, or a quote from the plan) and is tagged `CONFIRMED` or `UNVERIFIED`. Severity runs from S1 Blocker to S4 Nit.
 
 ### The hardened plan
 
-The final plan file always has these sections: objective and definition of done, context, assumptions, steps (each with exact files and a verification command with its expected result), test plan, risks and rollback, executor rules (stop-and-ask conditions and what's out of scope), and a hardening log.
+The final plan file always has these sections: objective and definition of done, context, assumptions, pre-flight steps for the user, steps (each with exact files and a verification command with its expected result), test plan, risks and rollback, executor rules (where the work lands, stop-and-ask conditions, commands your hooks block, and what's out of scope), and a hardening log.
+
+In plan mode it edits the plan-mode file, since plan mode allows writing nothing else. The plan's Step 0 tells the executor to copy it, once approved, to a durable path: the one you passed, else the hub plan it came from, else `./PLAN.md`.
 
 ### What it won't do
 
-It doesn't edit source files, install packages, run migrations, commit or push. The only file it writes is the plan. Read-only commands such as `grep`, `git log`, dry runs and the existing tests are fine.
+It doesn't edit source files, install packages, run migrations, commit or push. The only files it writes are the plan and scratch copies for the critic. Read-only commands such as `grep`, `git log`, dry runs and the existing tests are fine.
 
 ## Development
 
@@ -72,9 +74,14 @@ It doesn't edit source files, install packages, run migrations, commit or push. 
 claude plugin validate .
 ```
 
-CI (`.github/workflows/ci.yml`) checks the JSON manifests, the skill's frontmatter, and that the reference files exist.
+CI (`.github/workflows/ci.yml`) checks the JSON manifests, the skill's frontmatter, that the reference files exist, and that the plan linter passes `tests/fixtures/good-plan.md` and fails `tests/fixtures/bad-plan.md`.
 
-The whole plugin is the skill: [`skills/harden-plan/SKILL.md`](skills/harden-plan/SKILL.md) plus its two reference files. It's user-invoked only, so there's no trigger-eval suite.
+The plugin is:
+- the skill, [`skills/harden-plan/SKILL.md`](skills/harden-plan/SKILL.md), with its checklist and critic brief in `references/`;
+- [`scripts/lint_plan.py`](skills/harden-plan/scripts/lint_plan.py), a deterministic check for required sections, vague wording, references to chat context, and steps without verification (`python3 skills/harden-plan/scripts/lint_plan.py PLAN.md`);
+- [`agents/plan-critic.md`](agents/plan-critic.md), the read-only critic (no edit tools). If the skill is installed on its own, without the plugin, it falls back to a `general-purpose` agent with the same brief, or to a `Plan` agent if plan mode refuses that.
+
+It's user-invoked only, so there's no trigger-eval suite.
 
 ### Releasing
 

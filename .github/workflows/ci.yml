@@ -20,3 +20,10 @@ jobs:
         run: |
           test -f skills/harden-plan/references/checklist.md
           test -f skills/harden-plan/references/critic-prompt.md
+          test -f skills/harden-plan/scripts/lint_plan.py
+          test -f agents/plan-critic.md
+          grep -q '^name: plan-critic$' agents/plan-critic.md
+      - name: "Plan linter: good fixture passes, bad fixture fails"
+        run: |
+          python3 skills/harden-plan/scripts/lint_plan.py tests/fixtures/good-plan.md
+          ! python3 skills/harden-plan/scripts/lint_plan.py tests/fixtures/bad-plan.md
