@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 disallowedTools: Edit, Write, NotebookEdit, Agent
 model: inherit
 effort: high
+maxTurns: 40
 color: orange
 ---
 

@@ -12,10 +12,6 @@ Goal: turn the current plan into one that an executor with **no access to this c
 
 User input (may be empty): `$ARGUMENTS`
 
-Snapshot at invocation:
-- Branch and tree: !`git status --short --branch 2>/dev/null | head -15 || true`
-- Recent plan-mode files: !`ls -t ~/.claude/plans 2>/dev/null | head -5 || true`
-
 ## Ground rules
 
 - **No implementation.** Don't edit source files, install packages, run migrations, commit, or push. Read-only commands (reading files, grep, `git log`, `--version`, dry runs, running existing tests) are fine. The only files you write are the plan, its synced copy, and scratch files.
@@ -24,7 +20,12 @@ Snapshot at invocation:
 - **Deliberate choices still get reviewed.** A choice being intentional doesn't exempt it. Don't pad the list either: a clean area gets one line saying so.
 - **Decide what you can; ask only what you can't.** If the codebase, conventions, docs, memory, past plans, the machine or an obvious default answers something, decide it and record it under Assumptions. Ask the user only about real preferences, business rules, trade-offs with no clear winner, credentials or access, and anything destructive or irreversible.
 - **Secrets:** when grounding reads `.env` files, shell history or configs, note key *names* only. Never echo a value; if one turns up in plain text, report its location.
-- **Don't look idle.** Critics take minutes. Start them first and do your own work while they run. If you must end a turn while waiting, end it with: "Critic running; I'll continue automatically when it reports. No need to re-run /harden-plan."
+- **Spend tokens where they find problems.** Your run counts against the user's usage limits, and a critic is the most expensive part of it (each one re-reads the repo in a fresh context). So:
+  - Make independent tool calls in parallel in one message. Use `grep -n` and line ranges rather than reading whole files, and don't re-read a file you've already read this run unless it changed.
+  - Spawn exactly the critics the depth table allows, never extra ones "to be safe".
+  - Use `Explore` agents only for repos too big to grep, and pass them `model: "haiku"`.
+  - Keep chat output short; findings go in the plan's Hardening log.
+- **Don't look idle.** Critics take minutes. If you must end a turn while one runs, end it with: "Critic running; I'll continue automatically when it reports. No need to re-run /harden-plan."
 - **After compaction**, re-read `references/checklist.md` and this file's current phase before continuing.
 
 ## Phase 0: Locate the plan and pick the mode
@@ -45,7 +46,7 @@ Other questions that come up here (scope, preferences) wait for the Phase 5 batc
 
 **Re-run mode.** If the plan already has a Hardening log, or the user rejected ExitPlanMode and re-invoked you, this is a re-run. The previous pass missed something. Don't repeat it:
 - Re-read the whole plan and everything changed since the last log entry.
-- In Phase 3, give the critic a lens the Hardening log hasn't used yet (see [references/critic-prompt.md](references/critic-prompt.md)). Once all lenses are used, use `correctness` again with a fresh agent.
+- In Phase 4, give the critic a lens the Hardening log hasn't used yet (see [references/critic-prompt.md](references/critic-prompt.md)). Once all lenses are used, use `correctness` again with a fresh agent.
 - If the user said why they rejected it, that's the focus.
 - Rounds count per invocation.
 
@@ -66,13 +67,13 @@ If you can't restate the objective, or it doesn't match the request, that is fin
 
 **Pick the depth**, and state it in one line with the reason. `--quick` or `--deep` in `$ARGUMENTS` overrides the choice; otherwise decide from the plan:
 
-| Depth | When | Phase 3 critics | Research | Fix rounds |
+| Depth | When | Critic spawns | Research | Fix rounds |
 |---|---|---|---|---|
-| `quick` | ≤ 5 steps, one area, nothing destructive, no auth/data/infra/remote hosts | none: your own pass only | only for libraries or APIs the repo doesn't already use | 1 |
-| `standard` | everything else | 1, plus an `outcome` critic if anything user-visible changes | 3–8 lookups | up to 3 |
-| `deep` | auth, payments, data migrations, infra, remote hosts or shared machines, > 15 steps, or a re-run after a "Ready" that was wrong | 2 or 3 in parallel (see Phase 3) | as needed, including advisories | up to 3 |
+| `quick` | ≤ 5 steps, one area, nothing destructive, no auth/data/infra/remote hosts | 1: the Phase 6 sign-off, on a cheaper model | only for libraries or APIs the repo doesn't already use | 1 |
+| `standard` | everything else | 1 in Phase 4 (2 in parallel if anything user-visible changes); a Phase 6 sign-off only when its conditions apply | 3–8 lookups | up to 3 |
+| `deep` | auth, payments, data migrations, infra, remote hosts or shared machines, or > 15 steps | 2 in parallel in Phase 4 (3 if anything user-visible changes), plus the Phase 6 sign-off | as needed, including advisories | up to 3 |
 
-Every depth ends with the Phase 6 sign-off critic, so even `quick` gets one independent review of the final plan. A re-run is never `quick`.
+Every plan gets at least one independent critic review of a near-final version. A re-run is never `quick`.
 
 ## Phase 1: Ground in reality (parallel where possible)
 
@@ -82,7 +83,7 @@ Check that the plan matches the actual world before critiquing its logic:
 - **State:** git branch and dirty tree (including other sessions' uncommitted work in the files the plan touches), existing tests and whether they pass now (if cheap), DB/migration state if relevant.
 - **Executor environment** (checklist §2b): hooks and guards in user, project and plugin settings and what they block; the user's shell; commands only the user may run; which branch, worktree, DB and host the run uses; versions on every remote target. Check remote hosts read-only.
 - **The user's habits:** memory, CLAUDE.md and earlier plans in the same hub show how this user usually publishes, releases, tests and commits. Use them for defaults and recommended options.
-- For a large codebase, send `Explore` agents in parallel, one per area, instead of reading everything yourself.
+- Check these by targeted search, not by reading everything: grep settings files for hook matchers, grep earlier plans and memory for the decision you need rather than reading them whole. For a codebase too big to grep, send `Explore` agents (`model: "haiku"`) in parallel, one per area.
 
 ## Phase 2: Research
 
@@ -90,20 +91,9 @@ For each significant technical decision, library, API, or pattern in the plan, l
 
 If you skip research, write the reason in the Hardening log. Never state a technical claim to the user, or base a recommended option on one, without checking it. If you find a clearly better approach, raise it as a finding with the trade-off. Don't silently rewrite the architecture.
 
-## Phase 3: Critique
+## Phase 3: Your critique
 
-Run two passes and merge them. Start the critic first so it works while you do your own pass:
-1. **Fresh-eyes pass:** spawn a critic using [references/critic-prompt.md](references/critic-prompt.md). It tells you which agent type to use, how to give it the plan without your findings or the Hardening log, and which lens to give it.
-   - `quick`: skip this pass; the Phase 6 sign-off is the critic.
-   - `standard`: one critic, lens `correctness`. Add an `outcome` critic in parallel when the plan changes anything user-visible.
-   - `deep`: two in parallel, `correctness` + `failure`, or `executor-env` instead of `failure` if the run touches hosts, hooks or deploys. Add `outcome` as a third when anything user-visible changes.
-   - Never skip the critic because the plan looks fine, or because a general "no agents" preference exists. Invoking /harden-plan is the request for it.
-   - If a critic errors or stalls, retry once with a narrower scope. If that also fails, do the review yourself on a clean read of the plan, label it "self-review (critic unavailable)", and say so in the final summary.
-2. **Your pass, while the critic runs:** go through every dimension in [references/checklist.md](references/checklist.md). Skip a dimension only if it clearly doesn't apply, and say which ones you skipped.
-
-**Critic budget per invocation:** critics run only here and at the Phase 6 sign-off, at most **3 critic rounds** in all (parallel critics in one round count as one round; the sign-off counts). Phase 4 re-reviews are your own.
-
-**Merge:** drop duplicates. Verify each critic claim yourself, and reject any you can't confirm (note why). Rank by severity:
+Go through every dimension in [references/checklist.md](references/checklist.md). Skip a dimension only if it clearly doesn't apply, and say which ones you skipped. Rank each finding:
 
 | Sev | Meaning |
 |---|---|
@@ -114,17 +104,29 @@ Run two passes and merge them. Start the critic first so it works while you do y
 
 Record the findings table in the plan's Hardening log: `# | Sev | Area | Finding | Evidence | CONFIRMED/UNVERIFIED | Fix`. In chat, show only the S1/S2 rows and the counts. Each fix is concrete: what changes in the plan. Where it's a judgement call, give 2–3 options with a recommendation (include "do nothing" if that's reasonable).
 
-## Phase 4: Fix, then iterate
+Then fix (below) **before** any critic runs: a critic's tokens are better spent on problems you couldn't find than on ones you already have.
 
+**Fix, then iterate:**
 1. Apply every fix that doesn't need the user's input directly to the plan file.
 2. For each fix, ask: what legitimate case does this now block, and what did it add that the objective doesn't need? A fix that over-restricts or bloats is a new finding.
 3. Mark every item that needs the user as an **Open Question** (hold them for Phase 5).
 4. **Re-review the whole revised plan**, not just the changed sections. Fixes break other steps: ordering, references, shared variables, shell flags. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/lint_plan.py <plan>` and fix its errors.
 5. Only **CONFIRMED** S1/S2 findings start another round. UNVERIFIED ones become questions or go under Risks.
 
-Stop when a round finds no new confirmed S1/S2, then go to Phase 5. Cap at **3 fix rounds** per invocation (1 at `quick`; rounds after the user's answers count too). If the same issue keeps coming back, or the cap is reached, list it as unresolved with the reason. Don't loop.
+Stop when a round finds no new confirmed S1/S2. Cap at **3 fix rounds** per invocation, counting the rounds in Phases 4 and 5 too (1 at `quick`). If the same issue keeps coming back, or the cap is reached, list it as unresolved with the reason. Don't loop.
 
 Report each round in one line, naming who reviewed: `Round N (self | critic:<lens>): X found (S1:a S2:b S3:c), Y fixed, Z → questions`.
+
+## Phase 4: Independent critic
+
+Skip at `quick` (its only critic is the Phase 6 sign-off). Otherwise spawn critics on the revised plan using [references/critic-prompt.md](references/critic-prompt.md), in `review` mode. It tells you which agent type to use, how to give it the plan without your findings or the Hardening log, and the lenses.
+- `standard`: one critic, lens `correctness`; on a re-run, a lens the Hardening log hasn't used. Add an `outcome` critic in parallel when the plan changes anything user-visible.
+- `deep`: two in parallel, `correctness` + `failure`, or `executor-env` instead of `failure` if the run touches hosts, hooks or deploys. Add `outcome` as a third when anything user-visible changes.
+- Never skip the critic because the plan looks fine, or because a general "no agents" preference exists. Invoking /harden-plan is the request for it.
+- While it runs, draft (don't send) the Phase 5 questions and check whether you can answer any of them yourself.
+- If a critic errors or stalls, retry once with a narrower scope. If that also fails, do the review yourself on a clean read of the plan, label it "self-review (critic unavailable)", and say so in the final summary.
+
+**Merge:** drop duplicates. Verify each critic claim yourself, and reject any you can't confirm (note why). Add the rest to the findings table, fix them with the same rules as Phase 3, and report the round line.
 
 ## Phase 5: Ask everything at once
 
@@ -143,7 +145,7 @@ Put destructive, irreversible, or outward-facing actions (data deletion, force-p
 
 **After the answers:**
 - Fold each answer into the plan. Treat a free-text "Other" answer as an instruction, not as a prompt for clarifying questions, unless it conflicts with something.
-- Run a Phase 4 round on every section an answer touched.
+- Run a fix round (Phase 3 rules, your own review) on every section an answer touched.
 - If an answer changes the base branch, scope, target, core design or threat model, also re-run Phase 1 grounding on what changed.
 - If the answers raise new questions, ask them in one more batch.
 
@@ -151,11 +153,13 @@ If there are no open questions at all, say so and skip this phase.
 
 ## Phase 6: Sign-off, gate and handoff
 
-1. **Final critic sign-off.** Spawn one fresh critic on the **whole** final plan, with lens `correctness`, or `executor-env` if the run touches hosts, hooks or deploys. The fresh context is what matters, not a new lens. Skip it only if the previous critic round ran on this exact text with no edits since.
-   - New confirmed S1/S2: fix them, run the lint, and do one more sign-off if the critic budget allows.
-   - Still S1/S2, or no budget left: stop with "Not ready" and list them.
-   - If the sign-off raises a question only the user can answer, ask it in one final batch, apply the answer, and note in the summary that this change had no critic pass.
-   - Plan scope that changes after sign-off (the user adds a milestone, say) needs a new sign-off before handoff.
+1. **Sign-off critic.** Spawn one fresh critic on the **whole** final plan in `sign-off` mode (see [references/critic-prompt.md](references/critic-prompt.md)), with lens `correctness`, or `executor-env` if the run touches hosts, hooks or deploys. Pass `model: "sonnet"` unless the depth is `deep`. Run it when any of these is true, and otherwise skip it and say why in one line:
+   - the depth is `quick` or `deep`;
+   - the Phase 4 critic found confirmed S1/S2 that you then fixed;
+   - an answer in Phase 5 changed the base branch, scope, target, core design or threat model;
+   - the Phase 4 critic didn't run or failed.
+
+   If the sign-off finds new confirmed S1/S2, fix them and run the lint. Don't spawn another critic: say "Not ready" if a fix was large or unsure, and list what's left. If it raises a question only the user can answer, ask it in one final batch, apply the answer, and note that the change had no critic pass. Plan scope that changes after sign-off (the user adds a milestone, say) needs a new sign-off before handoff.
 2. **Readiness gate.** The plan must pass **every** item in the "Auto-mode readiness gate" section of [references/checklist.md](references/checklist.md), and `python3 ${CLAUDE_SKILL_DIR}/scripts/lint_plan.py <plan>` must report 0 errors. Fix any failure. One that can't be fixed means "Not ready", unless the user explicitly accepted it as a risk.
 
 Make sure the final plan file contains these sections (add any that are missing):
@@ -176,6 +180,6 @@ Make sure the final plan file contains these sections (add any that are missing)
 - Where the work lands: branch, worktree, push or no push.
 - The round lines, and the critics' lenses (covered and not covered).
 - A count of issues fixed by severity, decisions taken, and anything unresolved.
-- The verdict: **"Plan hardened. Ready for auto mode."** only if the final sign-off found no S1/S2 and the gate and lint pass. Otherwise **"Not ready: <reason>"**. Add "(self-reviewed; critic unavailable)" when that's what happened.
+- The verdict: **"Plan hardened. Ready for auto mode."** only if the last critic to review the plan (Phase 4, or Phase 6 when it ran) left no unfixed confirmed S1/S2, and the gate and lint pass. Otherwise **"Not ready: <reason>"**. Add "(self-reviewed; critic unavailable)" when that's what happened.
 
 If you're in plan mode, call ExitPlanMode with the final plan so the user can approve it and pick auto mode. Otherwise, **stop**. Don't begin implementing, even if it seems obvious.

@@ -118,5 +118,5 @@ All must be true before handoff:
 - [ ] Stop-and-ask conditions for the executor are listed.
 - [ ] Final full-suite check commands are listed (tests, lint, typecheck, build).
 - [ ] No open S1/S2 findings remain (or each is listed as an accepted, user-acknowledged risk).
-- [ ] A fresh critic signed off on the **final** plan with no new S1/S2 (Phase 6), or the summary says it couldn't run.
+- [ ] An independent critic reviewed the plan, and the last one to review it (Phase 4, or the Phase 6 sign-off when that was required) left no unfixed confirmed S1/S2; or the summary says a critic couldn't run.
 - [ ] All user questions are answered and incorporated.
