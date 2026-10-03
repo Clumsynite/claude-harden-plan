@@ -19,7 +19,7 @@ Work through each dimension. For every item, ask: *would an executor with no cha
 - Is there any step only a human can do ("confirm…", "use it for a few days", "check that it feels right")? Move it to a pre-flight list the user does before handoff, or to user acceptance after the run.
 
 ## 2b. Executor environment (will the run actually be allowed to do this, here?)
-- Hooks and guards in `~/.claude/settings.json`, `.claude/settings*.json` and installed plugins (command guards, clean-guard, PreToolUse hooks): which planned commands will they block? Common ones: `rm -rf "$VAR"`, `> "$VAR"` redirects, `<(…)`, `--no-verify`, force-push, `git stash`/`checkout` in a shared tree. Rewrite steps to avoid them (the Write/Edit tools instead of heredocs, literal paths).
+- Hooks and guards in `~/.claude/settings.json`, `.claude/settings*.json` and installed plugins (command guards, repo-policy hooks, PreToolUse hooks): which planned commands will they block? Common ones: `rm -rf "$VAR"`, `> "$VAR"` redirects, `<(…)`, `--no-verify`, force-push, `git stash`/`checkout` in a shared tree. Rewrite steps to avoid them (the Write/Edit tools instead of heredocs, literal paths).
 - Commands that only the user may run (e.g. a per-repo decision a hook reserves for the user): list them as pre-run actions.
 - Shell: the user's shell (zsh doesn't word-split unquoted `$VAR`), and whether scripts run under `sh`, `bash` or `dash`.
 - Auto mode: steps the safety check is likely to block (prod data, unknown remotes or hosts, broad deletes, credentials). Get specific approval up front, or rewrite them.

@@ -110,7 +110,7 @@ Then fix (below) **before** any critic runs: a critic's tokens are better spent 
 1. Apply every fix that doesn't need the user's input directly to the plan file.
 2. For each fix, ask: what legitimate case does this now block, and what did it add that the objective doesn't need? A fix that over-restricts or bloats is a new finding.
 3. Mark every item that needs the user as an **Open Question** (hold them for Phase 5).
-4. **Re-review the whole revised plan**, not just the changed sections. Fixes break other steps: ordering, references, shared variables, shell flags. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/lint_plan.py <plan>` and fix its errors.
+4. **Re-review the whole revised plan**, not just the changed sections. Fixes break other steps: ordering, references, shared variables, shell flags. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/lint_plan.py <plan>` and fix its errors. If `python3` isn't available (try `python` too), do the same checks by reading the plan: required sections, vague wording, references to this chat, a verification on every step. Say in the Hardening log that the linter didn't run.
 5. Only **CONFIRMED** S1/S2 findings start another round. UNVERIFIED ones become questions or go under Risks.
 
 Stop when a round finds no new confirmed S1/S2. Cap at **3 fix rounds** per invocation, counting the rounds in Phases 4 and 5 too (1 at `quick`). If the same issue keeps coming back, or the cap is reached, list it as unresolved with the reason. Don't loop.

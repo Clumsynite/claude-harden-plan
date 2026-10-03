@@ -25,3 +25,5 @@ claude -p "/harden-plan:harden-plan PLAN.md" --output-format json \
 Then grade `PLAN.md` against the graders' rubrics; `run.json` has the cost per model.
 
 Last manual run (2026-10-03, 0.2.0): all seven planted defects fixed, plus three real ones the plan had (a dirty-tree precheck that would always stop, a test helper named `run` that shadows `unittest.TestCase.run`, a final check that could never pass). 6 minutes, $2.00 list price: three critics at 200–240k cache-read tokens each (sign-off on Sonnet: $0.10).
+
+Plan-mode run (2026-10-03, 0.2.0, `draft-when-missing` task, `--permission-mode plan`): drafted the plan in the plan-mode file with the draft marker and a Step 0 copy to `./PLAN.md`, picked `quick`, one Sonnet sign-off critic (found 1 S2, fixed), lint 0 errors, no source edits. $1.30 list price. ExitPlanMode and AskUserQuestion aren't available headless, so those steps were skipped as expected.

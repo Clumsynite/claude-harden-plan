@@ -13,6 +13,15 @@ A Claude Code plugin that turns an implementation plan into one an agent can run
 
 A plan that reads fine in conversation often falls apart when an agent runs it alone: a file path that doesn't exist, an API from a newer version than the one installed, a step with no way to check it worked, a "handle errors appropriately" that forces a guess, or a destructive command nobody approved. Once you walk away, each of those is a failed or wrong run. harden-plan catches them first, while you're still at the keyboard.
 
+## Requirements
+
+- Claude Code with plugin support. Plan mode and auto mode are optional, but they're what the skill is built for.
+- `python3` on `PATH` for the plan linter. Without it the skill does the same checks by reading the plan, and says so.
+
+## Cost
+
+A run uses your plan's usage or API budget. The skill fixes what it finds itself first, so a typical (`standard`) run spawns one critic subagent. A second, cheaper sign-off critic runs only when the plan changed a lot after that. On the bundled test plan, a full run took 6 minutes and about $2 at API list prices. Real repos cost more. Use `--quick` for small plans.
+
 ## Install
 
 From GitHub:
