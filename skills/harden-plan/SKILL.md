@@ -1,7 +1,7 @@
 ---
 name: harden-plan
 description: Draft (if missing), adversarially review and repair an implementation plan until it can run unattended in auto mode. Grounds the plan in the real codebase and executor environment, researches best practices, lists every gap/flaw/risk with a fix, iterates until a fresh critic signs off, asks all open questions in one batch, then stops without implementing.
-argument-hint: "[plan-file | task description] [focus notes]"
+argument-hint: "[--quick | --deep] [plan-file | task description] [focus notes]"
 disable-model-invocation: true
 effort: high
 ---
@@ -64,6 +64,16 @@ When a plan already exists, any non-path text in `$ARGUMENTS` is focus notes: we
 
 If you can't restate the objective, or it doesn't match the request, that is finding #1.
 
+**Pick the depth**, and state it in one line with the reason. `--quick` or `--deep` in `$ARGUMENTS` overrides the choice; otherwise decide from the plan:
+
+| Depth | When | Phase 3 critics | Research | Fix rounds |
+|---|---|---|---|---|
+| `quick` | ≤ 5 steps, one area, nothing destructive, no auth/data/infra/remote hosts | none: your own pass only | only for libraries or APIs the repo doesn't already use | 1 |
+| `standard` | everything else | 1, plus an `outcome` critic if anything user-visible changes | 3–8 lookups | up to 3 |
+| `deep` | auth, payments, data migrations, infra, remote hosts or shared machines, > 15 steps, or a re-run after a "Ready" that was wrong | 2 or 3 in parallel (see Phase 3) | as needed, including advisories | up to 3 |
+
+Every depth ends with the Phase 6 sign-off critic, so even `quick` gets one independent review of the final plan. A re-run is never `quick`.
+
 ## Phase 1: Ground in reality (parallel where possible)
 
 Check that the plan matches the actual world before critiquing its logic:
@@ -84,9 +94,9 @@ If you skip research, write the reason in the Hardening log. Never state a techn
 
 Run two passes and merge them. Start the critic first so it works while you do your own pass:
 1. **Fresh-eyes pass:** spawn a critic using [references/critic-prompt.md](references/critic-prompt.md). It tells you which agent type to use, how to give it the plan without your findings or the Hardening log, and which lens to give it.
-   - Default: one critic, lens `correctness`.
-   - Two in parallel (`correctness` + `failure`, or `executor-env` if the run touches hosts, hooks or deploys) for large or high-risk plans: auth, payments, data migrations, infra, remote hosts, or more than ~15 steps.
-   - Add an `outcome` critic when the plan changes anything user-visible.
+   - `quick`: skip this pass; the Phase 6 sign-off is the critic.
+   - `standard`: one critic, lens `correctness`. Add an `outcome` critic in parallel when the plan changes anything user-visible.
+   - `deep`: two in parallel, `correctness` + `failure`, or `executor-env` instead of `failure` if the run touches hosts, hooks or deploys. Add `outcome` as a third when anything user-visible changes.
    - Never skip the critic because the plan looks fine, or because a general "no agents" preference exists. Invoking /harden-plan is the request for it.
    - If a critic errors or stalls, retry once with a narrower scope. If that also fails, do the review yourself on a clean read of the plan, label it "self-review (critic unavailable)", and say so in the final summary.
 2. **Your pass, while the critic runs:** go through every dimension in [references/checklist.md](references/checklist.md). Skip a dimension only if it clearly doesn't apply, and say which ones you skipped.
@@ -112,7 +122,7 @@ Record the findings table in the plan's Hardening log: `# | Sev | Area | Finding
 4. **Re-review the whole revised plan**, not just the changed sections. Fixes break other steps: ordering, references, shared variables, shell flags. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/lint_plan.py <plan>` and fix its errors.
 5. Only **CONFIRMED** S1/S2 findings start another round. UNVERIFIED ones become questions or go under Risks.
 
-Stop when a round finds no new confirmed S1/S2, then go to Phase 5. Cap at **3 fix rounds** per invocation (rounds after the user's answers count too). If the same issue keeps coming back, or the cap is reached, list it as unresolved with the reason. Don't loop.
+Stop when a round finds no new confirmed S1/S2, then go to Phase 5. Cap at **3 fix rounds** per invocation (1 at `quick`; rounds after the user's answers count too). If the same issue keeps coming back, or the cap is reached, list it as unresolved with the reason. Don't loop.
 
 Report each round in one line, naming who reviewed: `Round N (self | critic:<lens>): X found (S1:a S2:b S3:c), Y fixed, Z → questions`.
 

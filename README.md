@@ -39,6 +39,10 @@ A local marketplace loads the plugin in place, so edits take effect after `/relo
 | `/harden-plan:harden-plan path/to/PLAN.md` | Harden a specific plan file |
 | `/harden-plan:harden-plan path/to/PLAN.md focus on the migration` | The same, weighting some areas more heavily |
 | `/harden-plan:harden-plan add rate limiting to the API` | No plan yet: draft one for this task, then harden it |
+| `/harden-plan:harden-plan --quick PLAN.md` | Small plan: own review plus one critic sign-off, one fix round |
+| `/harden-plan:harden-plan --deep PLAN.md` | High-risk plan: two or three parallel critics, then the sign-off |
+
+Without a flag it picks the depth from the plan: `quick` for ≤ 5 low-risk steps in one area, `deep` for auth, payments, data migrations, infra, remote hosts, more than 15 steps, or a re-run after a wrong "Ready"; `standard` otherwise.
 
 The skill is user-invoked only (`disable-model-invocation`), so Claude never runs it unless you ask. It runs at `effort: high`.
 
@@ -81,7 +85,12 @@ The plugin is:
 - [`scripts/lint_plan.py`](skills/harden-plan/scripts/lint_plan.py), a deterministic check for required sections, vague wording, references to chat context, and steps without verification (`python3 skills/harden-plan/scripts/lint_plan.py PLAN.md`);
 - [`agents/plan-critic.md`](agents/plan-critic.md), the read-only critic (no edit tools). If the skill is installed on its own, without the plugin, it falls back to a `general-purpose` agent with the same brief, or to a `Plan` agent if plan mode refuses that.
 
-It's user-invoked only, so there's no trigger-eval suite.
+It's user-invoked only, so the evals test behaviour, not triggering. [`evals/`](evals/README.md) has two `claude plugin eval` cases: one plan with seven planted defects, and a draft-from-nothing run, both against a small fixture repo. A full run takes tens of minutes and counts against your usage, so CI doesn't run it:
+
+```
+claude plugin eval . --scaffold --ablation none --trust-plugin \
+  --allow-tools Bash Edit Write WebSearch WebFetch --max-cost-usd 20
+```
 
 ### Releasing
 
