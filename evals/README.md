@@ -13,3 +13,15 @@ claude plugin eval . --scaffold --ablation none --trust-plugin \
 ```
 
 Results go to `evals/results/` (git-ignored).
+
+If the eval refuses to start because `~/.docker` holds symlinks (Docker Desktop's own), Bash-granting evals can't run on that machine. The same check by hand:
+
+```
+d=$(mktemp -d) && cd "$d" && bash <plugin>/evals/planted-defects/fixture.sh
+claude -p "/harden-plan:harden-plan PLAN.md" --output-format json \
+  --allowedTools "Read Glob Grep Bash Edit Write Agent WebSearch WebFetch TodoWrite" < /dev/null > run.json
+```
+
+Then grade `PLAN.md` against the graders' rubrics; `run.json` has the cost per model.
+
+Last manual run (2026-10-03, 0.2.0): all seven planted defects fixed, plus three real ones the plan had (a dirty-tree precheck that would always stop, a test helper named `run` that shadows `unittest.TestCase.run`, a final check that could never pass). 6 minutes, $2.00 list price: three critics at 200–240k cache-read tokens each (sign-off on Sonnet: $0.10).
